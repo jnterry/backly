@@ -40,15 +40,13 @@ sub run {
          rbackup\@$opts->{host}:$task->{root}/
          ${dest}
   };
+	$cmd =~ s/\n//g;
 
-	print "$cmd\n";
+	print "Performing rsync of $opts->{host}:$task->{root}...\n";
+	qx{$cmd};
+	print "Rsync complete\n";
 
-  $cmd =~ s/\n//g;
-	print "$cmd\n";
-
-	# qx{$cmd};
-
-	# unlink $task_list;
+	unlink $task_list;
 	return 0;
 }
 
