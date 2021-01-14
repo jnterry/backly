@@ -1,4 +1,4 @@
-package Rbackup::Task::Rsync;
+package Backly::Task::Rsync;
 
 use strict;
 use warnings;
@@ -13,14 +13,14 @@ our @EXPORT_OK = qw(
 	run
 );
 
-sub run {
+sub backup {
 	my ($pkg, $opts, $task) = @_;
 
 	print "Running rsync task";
 	print Dumper($opts);
 	print Dumper($task);
 
-	my $dest = "$opts->{target}/filesystem/live$task->{root}";
+	my $dest = "$opts->{target}/live/filesystem$task->{root}";
 	make_path($dest);
 
 	my ($fh, $task_list) = tempfile("rbackup-rsync-XXXXXX", dir => '/tmp');
@@ -28,17 +28,21 @@ sub run {
 	print $fh _build_rsync_patterns($task->{include} // [], $task->{exclude} // []);
 	close $fh;
 
-	my $cmd = qq{/usr/bin/sudo /usr/bin/rsync -rz
-         -e 'ssh -i ./key'
-         --rsync-path='/usr/bin/sudo /usr/bin/rsync'
-         --perms --times
-         --links
-         -og --numeric-ids
-         --delete-after
-         --progress -h
-         --include-from=${task_list}
-         rbackup\@$opts->{host}:$task->{root}/
-         ${dest}
+	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
+	if($opts->{identity}){
+		$cmd .= qq{ -e 'ssh -i "$opts->{identity}"' };
+	}
+
+	$cmd .= qq {
+      --rsync-path='/usr/bin/sudo /usr/bin/rsync'
+      --perms --times
+      --links
+      -og --numeric-ids
+      --delete-after
+      --progress -h
+      --include-from=${task_list}
+      $opts->{host}:$task->{root}/
+      ${dest}
   };
 	$cmd =~ s/\n//g;
 

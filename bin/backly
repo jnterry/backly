@@ -1,0 +1,119 @@
+#!/usr/bin/perl -Ilib/
+
+use strict;
+use warnings;
+
+use File::Tee  qw(tee);
+use File::Path qw(make_path);
+use Getopt::Long::Descriptive qw(describe_options);
+use Module::Load;
+use POSIX;
+use Try::Tiny;
+use YAML qw(LoadFile);
+
+use Data::Dumper;
+
+my ($opts, $usaget) = describe_options(
+	'backly %o',
+	[ 'config|c=s',   'Path to config file describing what to backup',
+		{ required => 1 }
+	],
+	[ 'host|h=s',     'Name of host to backup - specify as user@host if should connect as user other than that which program is running as',
+		{ required => 1 }
+	],
+	[ 'target|t=s',   'Target directory into which the backup should be written',
+		{ required => 1 }
+	],
+	[ 'identity|i=s', 'Path to ssh key to use to connect to host',
+		{ default => undef }
+	],
+);
+
+exit main();
+
+sub main {
+
+	my $config = _load_config();
+
+  make_path($opts->{target});
+
+	my $timestamp = strftime "%Y%m%d_%H%M", localtime time;
+
+	# Create a new btrfs subvolume for the live data
+	unless(-d "$opts->{target}/live") {
+		qx|/usr/bin/btrfs subvolume create $opts->{target}/live|;
+	}
+
+	# Duplicate the backup's log to the target directory
+	my $log_path = "$opts->{target}/live/backly-log.txt";
+	truncate $log_path, 0;
+	tee STDOUT, '>>', $log_path;
+	tee STDERR, '>>', $log_path;
+
+	# Perform backup tasks
+	my $success = _run_tasks($config);
+
+	# Create read-only snapshot
+	make_path("$opts->{target}/snapshots");
+	my $snapshot_suffix = '';
+	unless($success) {
+		$snapshot_suffix = '-failed';
+	}
+	qx|/usr/bin/btrfs subvolume snapshot -r $opts->{target}/live $opts->{target}/snapshots/${timestamp}${snapshot_suffix}|;
+
+	return 0;
+}
+
+sub _load_config {
+	my $config = [];
+	if ( -f $opts->{config}) {
+		print "Loading file $opts->{config}\n";
+	  return [ LoadFile($opts->{config}) ];
+	}
+
+	if( -d $opts->{config}) {
+		my $config = [];
+
+		opendir (my $dh, $opts->{config});
+		foreach my $f (readdir($dh)) {
+			next unless $f =~ /\.yaml$/;
+
+			print "Loading file $opts->{config}/$f\n";
+
+			push @$config, $_ foreach LoadFile("$opts->{config}/$f");
+		}
+		closedir($dh);
+
+		return $config;
+	}
+
+	print STDERR "Specified config path '$opts->{config}' does not exist\n";
+	exit 1;
+}
+
+sub _run_tasks {
+	my ($config) = @_;
+
+	my $failed = 0;
+
+	for my $task (@$config) {
+		my $pkg = "Backly::Task::" . ucfirst($task->{type});
+		my $okay = try {
+			load ($pkg);
+			return 1;
+		} catch {
+			print STDERR "No such task type: $task->{type}: $_";
+			$failed = 1;
+		};
+		next unless $okay;
+
+		try {
+			$pkg->backup($opts, $task);
+		} catch {
+			print STDERR $_;
+			$failed = 1;
+		}
+	}
+
+	return !$failed;
+}
