@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 
+use Backly::Config qw(load_config);
+
 use File::Tee  qw(tee);
 use File::Path qw(make_path);
 use Getopt::Long::Descriptive qw(describe_options);
@@ -11,20 +13,16 @@ use POSIX;
 use Try::Tiny;
 use YAML qw(LoadFile);
 
+use Backly::Task::Rsync;
+
 use Data::Dumper;
 
-my ($opts, $usaget) = describe_options(
+my ($cli) = describe_options(
 	'backly %o',
-	[ 'config|c=s',   'Path to config file describing what to backup',
+	[ 'service|s=s',   'Name of service to run backup for',
 		{ required => 1 }
-	],
-	[ 'host|h=s',     'Name of host to backup - specify as user@host if should connect as user other than that which program is running as',
-		{ required => 1 }
-	],
-	[ 'target|t=s',   'Target directory into which the backup should be written',
-		{ required => 1 }
-	],
-	[ 'identity|i=s', 'Path to ssh key to use to connect to host',
+  ],
+	[ 'identity|i=s', 'Path to ssh key to use to connect to host(s)',
 		{ default => undef }
 	],
 );
@@ -33,70 +31,48 @@ exit main();
 
 sub main {
 
-	my $config = _load_config();
+	my $config = load_config();
+	$config->{ssh}{key_path} = $cli->{identity} if $cli->{identity};
 
-  make_path($opts->{target});
+	my $service = LoadFile(($config->{services} || '/etc/backly/services.d') . '/' . $cli->{service} . '.yaml');
+
+	my $targetDir = $config->{destination} . "/" . ($service->{name} || $cli->{service});
+
+  make_path($targetDir);
 
 	my $timestamp = strftime "%Y%m%d_%H%M", localtime time;
 
 	# Create a new btrfs subvolume for the live data
-	unless(-d "$opts->{target}/live") {
-		qx|/usr/bin/btrfs subvolume create $opts->{target}/live|;
+	unless(-d "$targetDir/live") {
+		qx|/usr/bin/btrfs subvolume create $targetDir/live|;
 	}
 
 	# Duplicate the backup's log to the target directory
-	my $log_path = "$opts->{target}/live/backly-log.txt";
+	my $log_path = "${targetDir}/live/backly-log.txt";
 	truncate $log_path, 0;
 	tee STDOUT, '>>', $log_path;
 	tee STDERR, '>>', $log_path;
 
 	# Perform backup tasks
-	my $success = _run_tasks($config);
+	my $success = _run_tasks($config, "$targetDir/live", $service);
 
 	# Create read-only snapshot
-	make_path("$opts->{target}/snapshots");
+	make_path("$targetDir/snapshots");
 	my $snapshot_suffix = '';
 	unless($success) {
 		$snapshot_suffix = '-failed';
 	}
-	qx|/usr/bin/btrfs subvolume snapshot -r $opts->{target}/live $opts->{target}/snapshots/${timestamp}${snapshot_suffix}|;
+	qx|/usr/bin/btrfs subvolume snapshot -r $targetDir/live $targetDir/snapshots/${timestamp}${snapshot_suffix}|;
 
 	return 0;
 }
 
-sub _load_config {
-	my $config = [];
-	if ( -f $opts->{config}) {
-		print "Loading file $opts->{config}\n";
-	  return [ LoadFile($opts->{config}) ];
-	}
-
-	if( -d $opts->{config}) {
-		my $config = [];
-
-		opendir (my $dh, $opts->{config});
-		foreach my $f (readdir($dh)) {
-			next unless $f =~ /\.yaml$/;
-
-			print "Loading file $opts->{config}/$f\n";
-
-			push @$config, $_ foreach LoadFile("$opts->{config}/$f");
-		}
-		closedir($dh);
-
-		return $config;
-	}
-
-	print STDERR "Specified config path '$opts->{config}' does not exist\n";
-	exit 1;
-}
-
 sub _run_tasks {
-	my ($config) = @_;
+	my ($config, $targetDir, $service) = @_;
 
 	my $failed = 0;
 
-	for my $task (@$config) {
+	for my $task (@{$service->{tasks}}) {
 		my $pkg = "Backly::Task::" . ucfirst($task->{type});
 		my $okay = try {
 			load ($pkg);
@@ -107,8 +83,15 @@ sub _run_tasks {
 		};
 		next unless $okay;
 
+		my $taskTarget = "${targetDir}/$task->{name}";
+		make_path($taskTarget);
+
+		my $fullTaskConfig = $task;
+		if($config->{task_defaults}{$task->{type}}){
+			$fullTaskConfig = { %{$config->{taskDefaults}{$task->{type}}}, %$task };
+		}
 		try {
-			$pkg->backup($opts, $task);
+			$pkg->backup($config, $taskTarget, $fullTaskConfig);
 		} catch {
 			print STDERR $_;
 			$failed = 1;

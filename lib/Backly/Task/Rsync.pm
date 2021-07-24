@@ -10,28 +10,27 @@ use Data::Dumper;
 
 use Exporter qw(import);
 our @EXPORT_OK = qw(
-	run
+  backup
 );
 
 sub backup {
-	my ($pkg, $opts, $task) = @_;
+	my ($pkg, $config, $destination, $task) = @_;
 
-	print "Running rsync task";
-	print Dumper($opts);
-	print Dumper($task);
-
-	my $dest = "$opts->{target}/live/filesystem$task->{root}";
-	make_path($dest);
-
-	my ($fh, $task_list) = tempfile("rbackup-rsync-XXXXXX", dir => '/tmp');
-
+	my ($fh, $task_list) = tempfile("backly-rsync-XXXXXX", dir => '/tmp');
 	print $fh _build_rsync_patterns($task->{include} // [], $task->{exclude} // []);
 	close $fh;
 
 	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
-	if($opts->{identity}){
-		$cmd .= qq{ -e 'ssh -i "$opts->{identity}"' };
+	if($config->{ssh}{key_path}){
+		$cmd .= qq{ -e 'ssh -i "$config->{ssh}{key_path}"' };
 	}
+
+	my $ssh_str = $task->{host} . ':' . $task->{root} . '/';
+	$ssh_str .= '/' unless $ssh_str =~ m|/$|;
+	$ssh_str = $config->{ssh}{user} . '@' . $ssh_str if $config->{ssh}{user} and $task->{host} !~ /@/;
+
+	my $targetDir = "${destination}$task->{root}";
+	make_path($targetDir);
 
 	$cmd .= qq {
       --rsync-path='/usr/bin/sudo /usr/bin/rsync'
@@ -41,12 +40,11 @@ sub backup {
       --delete-after
       --progress -h
       --include-from=${task_list}
-      $opts->{host}:$task->{root}/
-      ${dest}
+      ${ssh_str} ${targetDir}
   };
 	$cmd =~ s/\n//g;
 
-	print "Performing rsync of $opts->{host}:$task->{root}...\n";
+	print "Performing rsync of $task->{host}:$task->{root}...\n";
 	qx{$cmd};
 	print "Rsync complete\n";
 
