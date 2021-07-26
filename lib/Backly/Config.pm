@@ -14,7 +14,7 @@ our @EXPORT_OK = qw(
 sub load_config {
 	my $path = $ENV{BACKLY_CONFIG} || '/etc/backly/backly.yaml';
 
-	print "Loading config from $path\n";
+	print "Loading global config from $path\n";
 
 	my $config = LoadFile($path);
 	die "Config at $path must include 'destination' parameter" unless defined $config->{destination};

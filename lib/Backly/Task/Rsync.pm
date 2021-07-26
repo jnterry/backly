@@ -6,12 +6,8 @@ use warnings;
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
 
-use Data::Dumper;
-
 use Exporter qw(import);
-our @EXPORT_OK = qw(
-  backup
-);
+our @EXPORT_OK = qw(backup);
 
 sub backup {
 	my ($pkg, $config, $destination, $task) = @_;

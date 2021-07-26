@@ -13,8 +13,6 @@ use POSIX;
 use Try::Tiny;
 use YAML qw(LoadFile);
 
-use Backly::Task::Rsync;
-
 use Data::Dumper;
 
 my ($cli) = describe_options(
@@ -57,12 +55,14 @@ sub main {
 	my $success = _run_tasks($config, "$targetDir/live", $service);
 
 	# Create read-only snapshot
-	make_path("$targetDir/snapshots");
 	my $snapshot_suffix = '';
-	unless($success) {
-		$snapshot_suffix = '-failed';
-	}
+	$snapshot_suffix = '-failed' unless($success);
+	my $snapshot_name = "${timestamp}${snapshot_suffix}";
+
+	print "All backup tasks complete, creating snapshot ${snapshot_name}...\n";
+	make_path("$targetDir/snapshots");
 	qx|/usr/bin/btrfs subvolume snapshot -r $targetDir/live $targetDir/snapshots/${timestamp}${snapshot_suffix}|;
+	print "Snapshot created\n";
 
 	return 0;
 }
@@ -71,32 +71,40 @@ sub _run_tasks {
 	my ($config, $targetDir, $service) = @_;
 
 	my $failed = 0;
+	my $taskCount = @{$service->{tasks}};
+
+	print "Running $taskCount tasks for service '$service->{name}'\n";
 
 	for my $task (@{$service->{tasks}}) {
+
+		print "Running $task->{type} task: $task->{name}\n";
+
 		my $pkg = "Backly::Task::" . ucfirst($task->{type});
-		my $okay = try {
-			load ($pkg);
-			return 1;
-		} catch {
-			print STDERR "No such task type: $task->{type}: $_";
-			$failed = 1;
+
+		my $gotModule = 1;
+		eval "require $pkg" or do {
+			print STDERR "No implementation for task type '$task->{type}': $@\n";
+			$gotModule = 1;
+			++$failed;
 		};
-		next unless $okay;
+		next unless $gotModule;
 
 		my $taskTarget = "${targetDir}/$task->{name}";
 		make_path($taskTarget);
 
 		my $fullTaskConfig = $task;
 		if($config->{task_defaults}{$task->{type}}){
-			$fullTaskConfig = { %{$config->{taskDefaults}{$task->{type}}}, %$task };
+			$fullTaskConfig = { %{$config->{task_defaults}{$task->{type}}}, %$task };
 		}
 		try {
 			$pkg->backup($config, $taskTarget, $fullTaskConfig);
 		} catch {
 			print STDERR $_;
-			$failed = 1;
+			++$failed;
 		}
 	}
+
+	print "$failed of $taskCount tasks failed\n" if $failed;
 
 	return !$failed;
 }
