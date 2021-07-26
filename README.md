@@ -1,6 +1,6 @@
 # Overview
 
-`backly` is a tool for remotely backing up systems over ssh.
+`backly` is a dumb-but-simple tool for remotely backing up systems over ssh.
 
 A central backup server should be setup with the `backly` tool installed, with a btrfs filesystem so that automatic copy-on-write snapshots can be taken of the data.
 
@@ -23,31 +23,31 @@ While this "pull over ssh" model is unlikely to be as scalable as all servers in
 
 ## Services and Tasks
 
-`backly` groups jobs into high level "services", which each represent an individually managed set of point in time snapshots.
+`backly` groups jobs into high level "services", each of which represents a logical bundle of data which can be backed up and restored in isolation. Backly manages an independent set of point-in-time snapshots for each service.
 
 Each service may consist of multiple tasks, for example "rsync this directory", "dump this database", etc. Note that a service may consist of tasks which pull data from different physical machines.
 
 This allows `backly` to produce semi-consistent views of an entire service, for example, a backup of a CMS may pull both assets from a file server, and meta data about those assets from a seperate database server.
 
-These snapshots are "semi-consistent", since `backly` will perform all tasks within a service as close together as possible, but as tasks may take different amounts of time to complete, there could be minor discrepancies. This will be exacerbated if the target service only has eventual-consistency guarantees.
+These snapshots are "semi-consistent", since `backly` will perform all tasks within a service as temporally close together as possible, but since tasks may take different amounts of time to complete, there could be discrepancies. This will be exacerbated if the target service only has eventual-consistency guarantees.
 
 # Config
 
-The root configuration for backly should be placed in `/etc/backly/backly.yaml` and be of the following form:
+The root configuration for backly is usually placed at `/etc/backly/backly.yaml` and should be of the following form:
 
 ```yaml
 # Root where backups are written - must be a btrfs filesystem for snapshots and diffs
 destination: '/mnt/backup'
 
-# Directory containing yaml files for each service to backup
+# Directory containing yaml files describing task list for each service to backup
 services: '/etc/backly/services.d'
 
 # SSH options
 ssh:
-  user: 'backly'                  # which user to SSH in as, defaults to undefined which will ssh in as the unix user running backly script
-  key_path: '/etc/backly/key.rsa' # ssh keypath, defaults to undefined, which uses default ssh agent of unix user running backly script
+  user: 'backly'                  # which user to SSH in as, if undefined which will ssh in as the unix user running backly script
+  key_path: '/etc/backly/key.rsa' # ssh keypath, if undefined, uses default ssh agent of unix user running backly script
 
-# Default parameters for each task type
+# Default parameters for each task type - merged with the data in task definition
 task_defaults:
   mysql:
     username: 'backups'
@@ -57,19 +57,21 @@ task_defaults:
 Each service yaml should be of the form:
 
 ```yaml
-name: 'cms'
+name: 'cms' # name of the service, data will be written to subdirectory named after the service in global $destination variable
 
 tasks:
   - name: 'assets'
     type: 'rsync'
     host: 'cms-assets.example.com'
-    # type specific config...
+    # type specific config (merged with corresponding task_defaults)
 	root: '/mnt/cms
 	include:
 	  - 'assets/**'
   - name: 'meta'
     type: 'mysql'
 	host: 'cms-db.example.com'
-    # type specific config...
+    # type specific config (merged with corresponding task_defaults)
 	database: 'cms'
 ```
+
+A full list of "task types" and their correspondig parameters can be found by examining the contents of the [lib/Backly/Task](task directory).

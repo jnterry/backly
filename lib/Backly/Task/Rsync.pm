@@ -1,5 +1,11 @@
 package Backly::Task::Rsync;
 
+=head1 OVERVIEW C<rsync>
+
+Backup task which rsyncs data from source server to backup server
+
+=cut
+
 use strict;
 use warnings;
 
@@ -9,6 +15,39 @@ use File::Temp qw(tempfile);
 use Exporter qw(import);
 our @EXPORT_OK = qw(backup);
 
+=head1 TASK PARAMETERS
+
+=over 4
+
+=item C<root>
+
+Mandatory root file path location to rsync form
+
+=item C<include>
+
+Array of rsync --include patterns
+
+Note that unlike plain rsync, we automatically generate all prefixes of the --include
+pattern, eg, a/b/persistant would be skipped if we had the patterns:
++ **/persistant
+- *
+Since the global exclude * prevents recursion down through a/ and b/
+
+=item C<exclude>
+
+Array of rsync --exclude patterns
+
+=back
+
+=head1 FUNCTIONS
+
+=over 4
+
+=item C<backup>
+
+Implementation of rsync backup task
+
+=cut
 sub backup {
 	my ($pkg, $config, $destination, $task) = @_;
 
@@ -115,5 +154,9 @@ sub _build_rsync_patterns {
 	return $result;
 
 }
+
+=back
+
+=cut
 
 1;

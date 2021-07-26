@@ -1,18 +1,46 @@
 package Backly::Task::Mysql;
 
+=head1 OVERVIEW C<mysql>
+
+Backup task which uses mysqldump to generate a snapshot of database
+
+=cut
+
 use strict;
 use warnings;
 
-use File::Path qw(make_path);
-use File::Temp qw(tempfile);
-
 use Backly::SshUtils qw(open_ssh);
-
-use Data::Dumper;
 
 use Exporter qw(import);
 our @EXPORT_OK = qw(backup);
 
+=head1 TASK PARAMETERS
+
+=over 4
+
+=item C<username>
+
+Mysql username to login as - must have SELECT privileges on target database
+
+=item C<password>
+
+Mysql password to login with
+
+=item C<database>
+
+Name of the database to backup
+
+=back
+
+=head1 FUNCTIONS
+
+=over 4
+
+=item C<backup>
+
+Implementation of mysql backup task
+
+=cut
 sub backup {
 	my ($pkg, $config, $destination, $task) = @_;
 
@@ -42,5 +70,9 @@ sub backup {
 
 	return 0;
 }
+
+=back
+
+=cut
 
 1;
