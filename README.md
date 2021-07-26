@@ -51,7 +51,7 @@ ssh:
 task_defaults:
   mysql:
     username: 'backups'
-	password: 'backups'
+    password: 'backups'
 ```
 
 Each service yaml should be of the form:
@@ -64,14 +64,14 @@ tasks:
     type: 'rsync'
     host: 'cms-assets.example.com'
     # type specific config (merged with corresponding task_defaults)
-	root: '/mnt/cms
-	include:
-	  - 'assets/**'
+    root: '/mnt/cms
+    include:
+      - 'assets/**'
   - name: 'meta'
     type: 'mysql'
-	host: 'cms-db.example.com'
+    host: 'cms-db.example.com'
     # type specific config (merged with corresponding task_defaults)
-	database: 'cms'
+    database: 'cms'
 ```
 
-A full list of "task types" and their correspondig parameters can be found by examining the contents of the [lib/Backly/Task](task directory).
+A full list of "task types" and their corresponding parameters can be found by examining the contents of the [task directory](lib/Backly/Task) (use perldoc to view parameter docs for each task).
