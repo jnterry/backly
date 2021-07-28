@@ -12,6 +12,8 @@ use warnings;
 use POSIX qw(floor);
 use DateTime;
 
+use Data::Dumper;
+
 use Exporter qw(import);
 our @EXPORT_OK = qw(
   compute_retained
@@ -62,7 +64,18 @@ sub compute_retained {
 	my %kept = ();
 	foreach my $group (@groups) {
 		foreach my $bucket (@{$group->{buckets}}) {
-			$kept{$bucket->[0]} = 1;
+			# find oldest non-failed run
+			my $found = 0;
+			foreach my $snap (@${bucket}) {
+				if($snap !~ /-failed/) {
+					$kept{$snap} = 1;
+					$found = 1;
+				  last;
+				}
+			}
+
+			# fallback to whatever the oldest is
+			$kept{$bucket->[0]} = 1 unless $found;
 		}
 	}
 
@@ -118,6 +131,8 @@ sub _bucket_by_all {
 	my %buckets = ();
 	$buckets{$_} = [$_] foreach (keys %$snapshots);
 
+	print Dumper(\%buckets);
+
 	return _post_process_buckets($limit, %buckets);
 }
 
@@ -133,9 +148,12 @@ sub _post_process_buckets {
 
 	# keep only the $limit most recent buckets
 	my @results = keys %buckets;
+	print Dumper(\@results);
 	@results = sort { $b cmp $a } @results;
-	@results = grep { defined $_ } @results[0..$limit-1];
-	@results = map  { $buckets{$_} } @results;
+	@results = grep { defined $_ } @results[0..$limit-1]; # limit to n most recent
+	@results = map  { $buckets{$_} } @results; # map from bucket names to items array
+
+	print Dumper(\@results);
 
 	return \@results;
 }

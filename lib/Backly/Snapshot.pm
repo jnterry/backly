@@ -121,3 +121,9 @@ sub delete_old_snapshots {
 
 	return $toDeleteCount;
 }
+
+=back
+
+=cut
+
+1;
