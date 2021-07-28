@@ -81,6 +81,7 @@ sub backup {
 
 	print "Performing rsync of $task->{host}:$task->{root}...\n";
 	qx{$cmd};
+	die "Rsync failed, exit: $?" unless $? == 0;
 	print "Rsync complete\n";
 
 	unlink $task_list;
