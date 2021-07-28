@@ -16,10 +16,6 @@ severity = 4
 # following
 ####
 
-# Use spaces instead of tabs.
-[CodeLayout::ProhibitHardTabs]
-severity = 4
-
 # Don't use whitespace at the end of lines.
 [CodeLayout::ProhibitTrailingWhitespace]
 severity = 4
@@ -30,10 +26,6 @@ severity = 4
 
 # Minimize complexity in code that is outside of subroutines.
 [Modules::ProhibitExcessMainComplexity]
-severity = 4
-
-# Too many arguments.
-[Subroutines::ProhibitManyArgs]
 severity = 4
 
 # Prevent access to private subs in other packages.
@@ -72,11 +64,3 @@ severity = 3
 # Don't make code outside subroutines too complex
 [Modules::ProhibitExcessMainComplexity]
 severity = 3
-
-# Don't use too many arguments
-[Subroutines::ProhibitManyArgs]
-severity = 3
-
-# Allow overwritting value of $!
-[Variables::RequireLocalizedPunctuationVars]
-allow = $! %ENV
