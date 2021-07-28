@@ -3,13 +3,13 @@
 use strict;
 use warnings;
 
-use Backly::Config qw(load_config);
+use Backly::Config   qw(load_config);
+use Backly::Snapshot qw(create_live_volume create_snapshot delete_old_snapshots);
 
 use File::Tee  qw(tee);
 use File::Path qw(make_path);
 use Getopt::Long::Descriptive qw(describe_options);
 use Module::Load;
-use POSIX;
 use Try::Tiny;
 use YAML qw(LoadFile);
 
@@ -23,52 +23,55 @@ my ($cli) = describe_options(
 	[ 'identity|i=s', 'Path to ssh key to use to connect to host(s)',
 		{ default => undef }
 	],
+	[ 'keep-snapshots|k', 'If set, will ignore retention config and keep all existing snapshots',
+		{ default => undef }
+	],
 );
 
 exit main();
 
 sub main {
-
+	# Load global backly config
 	my $config = load_config();
 	$config->{ssh}{key_path} = $cli->{identity} if $cli->{identity};
 
+	# Load service specific config
 	my $service = LoadFile(($config->{services} || '/etc/backly/services.d') . '/' . $cli->{service} . '.yaml');
-
-	my $targetDir = $config->{destination} . "/" . ($service->{name} || $cli->{service});
-
-  make_path($targetDir);
-
-	my $timestamp = strftime "%Y%m%d_%H%M", localtime time;
+	my $serviceDir = $config->{destination} . "/" . ($service->{name} || $cli->{service});
 
 	# Create a new btrfs subvolume for the live data
-	unless(-d "$targetDir/live") {
-		qx|/usr/bin/btrfs subvolume create $targetDir/live|;
-	}
+	my $liveDir = create_live_volume($serviceDir);
 
 	# Duplicate the backup's log to the target directory
-	my $log_path = "${targetDir}/live/backly-log.txt";
+	my $log_path = "${liveDir}/backly-log.txt";
 	truncate $log_path, 0;
 	tee STDOUT, '>>', $log_path;
 	tee STDERR, '>>', $log_path;
 
 	# Perform backup tasks
-	my $success = _run_tasks($config, "$targetDir/live", $service);
+	my $success = _run_tasks($config, $liveDir, $service);
 
 	# Create read-only snapshot
-	my $snapshot_suffix = '';
-	$snapshot_suffix = '-failed' unless($success);
-	my $snapshot_name = "${timestamp}${snapshot_suffix}";
+	create_snapshot($serviceDir, $success);
 
-	print "All backup tasks complete, creating snapshot ${snapshot_name}...\n";
-	make_path("$targetDir/snapshots");
-	qx|/usr/bin/btrfs subvolume snapshot -r $targetDir/live $targetDir/snapshots/${timestamp}${snapshot_suffix}|;
-	print "Snapshot created\n";
+	# Remove any out of date snapshots
+	my $retentionConfig = $service->{retention} || $config->{default_retention};
+	if($cli->{keep_snapshots}){
+		print "Not deleting old snapshots due to cli arguments\n";
+	} elsif (!defined $retentionConfig) {
+		print "No retention config for service - keeping all snapshots\n";
+	} elsif (!$success) {
+		print "Skipping deleting old snapshots since backup was not fully successful\n";
+	} else {
+		delete_old_snapshots($serviceDir, $retentionConfig);
+	}
 
-	return 0;
+	return $success ? 0 : 1;
 }
 
+# Helper which runs the individual tasks within a service
 sub _run_tasks {
-	my ($config, $targetDir, $service) = @_;
+	my ($config, $serviceDir, $service) = @_;
 
 	my $failed = 0;
 	my $taskCount = @{$service->{tasks}};
@@ -89,7 +92,7 @@ sub _run_tasks {
 		};
 		next unless $gotModule;
 
-		my $taskTarget = "${targetDir}/$task->{name}";
+		my $taskTarget = "${serviceDir}/$task->{name}";
 		make_path($taskTarget);
 
 		my $fullTaskConfig = $task;

@@ -33,6 +33,8 @@ These snapshots are "semi-consistent", since `backly` will perform all tasks wit
 
 # Config
 
+## Global Config
+
 The root configuration for backly is usually placed at `/etc/backly/backly.yaml` and should be of the following form:
 
 ```yaml
@@ -53,6 +55,8 @@ task_defaults:
     username: 'backups'
     password: 'backups'
 ```
+
+## Service Config
 
 Each service yaml should be of the form:
 
@@ -75,3 +79,23 @@ tasks:
 ```
 
 A full list of "task types" and their corresponding parameters can be found by examining the contents of the [task directory](lib/Backly/Task) (use perldoc to view parameter docs for each task).
+
+## Retention Config
+
+A retention config is used to control which snapshots to keep, this can be placed in the service yaml file, under the key `retention`, or the global yaml file, under the key `default_retention` used by services with no specific `retention` config. If neither is specified, backly will not automatically delete old snapshots.
+
+Retention works by grouping the snapshots into buckets of different interval sizes (hourly, weekly, etc), keeping snapshots from the n most recent buckets, and finding the oldest non-failed snapshot in each kept bucket.
+
+Multiple intervals can be specified simultaneously, eg to keep the most recent hourly backups and the most recent daily backups.
+
+The special interval `all` will not sort into buckets, and just keeps the n most recent backups.
+
+```yaml
+retention:
+  all: 3
+  hourly: 48
+  daily: 14
+  weekly: 12
+  monthly: 12
+  yearly: 3
+```

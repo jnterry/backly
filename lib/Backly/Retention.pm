@@ -21,6 +21,7 @@ our @EXPORT_OK = qw(
 # Dispatch table which maps from RETENTION_INTERVALS to a function of the type:
 # ($snapshots, $limit) => $buckets
 my %RETENTION_INTERVALS = (
+	all         => sub { _bucket_by_prefix(@_, 'yyyymmdd_hhmm') },
 	hourly      => sub { _bucket_by_prefix(@_, 'yyyymmdd_hh') },
 	daily       => sub { _bucket_by_prefix(@_, 'yyyymmdd'   ) },
 	monthly     => sub { _bucket_by_prefix(@_, 'yyyymm'     ) },
