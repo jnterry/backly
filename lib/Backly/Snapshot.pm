@@ -111,7 +111,12 @@ sub delete_old_snapshots {
 	delete $toDelete{$_} foreach @$toKeep;
 
 	my $toDeleteCount = scalar keys %toDelete;
-	return 0 unless $toDeleteCount;
+
+	unless($toDeleteCount) {
+		print "Retaining all current snapshots\n";
+		return 0 unless $toDeleteCount;
+	}
+
 	my $keepCount = (scalar @snaps) - $toDeleteCount;
 	die "Retention config would keep 0 snapshots - ignoring and keeping all" unless $keepCount;
 
