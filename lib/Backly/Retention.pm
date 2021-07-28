@@ -11,7 +11,6 @@ use warnings;
 
 use POSIX qw(floor);
 use DateTime;
-use Data::Dumper;
 
 use Exporter qw(import);
 our @EXPORT_OK = qw(
@@ -21,7 +20,7 @@ our @EXPORT_OK = qw(
 # Dispatch table which maps from RETENTION_INTERVALS to a function of the type:
 # ($snapshots, $limit) => $buckets
 my %RETENTION_INTERVALS = (
-	all         => sub { _bucket_by_prefix(@_, 'yyyymmdd_hhmm') },
+	all         => sub { _bucket_by_all(@_) },
 	hourly      => sub { _bucket_by_prefix(@_, 'yyyymmdd_hh') },
 	daily       => sub { _bucket_by_prefix(@_, 'yyyymmdd'   ) },
 	monthly     => sub { _bucket_by_prefix(@_, 'yyyymm'     ) },
@@ -46,10 +45,6 @@ snapshots which should still be retained
 sub compute_retained {
 	my ($snap_names, $retention) = @_;
 
-	print "Compute retention for " . Dumper($snap_names);
-	print Dumper($retention);
-
-
 	my %snapshots = ();
 	$snapshots{$_} = _parse_dt($_) foreach (@$snap_names);
 
@@ -67,7 +62,6 @@ sub compute_retained {
 	my %kept = ();
 	foreach my $group (@groups) {
 		foreach my $bucket (@{$group->{buckets}}) {
-			print "Keeping from bucket " . Dumper($bucket);
 			$kept{$bucket->[0]} = 1;
 		}
 	}
@@ -113,6 +107,16 @@ sub _bucket_by_week {
 		$buckets{$bucket} //= [];
 		push @{$buckets{$bucket}}, $snap_name;
 	}
+
+	return _post_process_buckets($limit, %buckets);
+}
+
+# Helper which generates bucket per snapshot (in order to keep them all)
+sub _bucket_by_all {
+	my ($snapshots, $limit) = @_;
+
+	my %buckets = ();
+	$buckets{$_} = [$_] foreach (keys %$snapshots);
 
 	return _post_process_buckets($limit, %buckets);
 }

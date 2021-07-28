@@ -38,6 +38,7 @@ sub create_live_volume {
 	my $liveDir = "$serviceDir/live";
 
 	qx|/usr/bin/btrfs subvolume create $liveDir| unless (-d "$serviceDir/live");
+	die "Failed to create live subvolume for $serviceDir, exit: $?" unless $? == 0;
 
 	return $liveDir;
 }
@@ -58,7 +59,17 @@ sub create_snapshot {
 	print "Creating snapshot ${snapName}...\n";
 	make_path("${serviceDir}/snapshots");
 	my $snapPath = "${serviceDir}/snapshots/${snapName}";
+
+	if(-d $snapPath) {
+		my $i = 2;
+		while(-d "${snapPath}-${i}") { ++$i; }
+		$snapPath .= "-${i}";
+		print "Found existing snapshot at intended path, will use $snapPath\n";
+	}
+
 	qx|/usr/bin/btrfs subvolume snapshot -r $serviceDir/live $snapPath|;
+	die "Failed to create snapshot, exit: $?" unless $? == 0;
+
 	print "Snapshot created at $snapPath\n";
 
 	return $snapPath;
@@ -73,6 +84,7 @@ sub delete_snapshot {
 	my ($path) = @_;
 
 	qx|/usr/bin/btrfs subvolume delete $path| if -d $path;
+	die "Failed to delete snapshot $path, exit: $?" unless $? == 0;
 }
 
 =item C<delete_old_snapshots>
