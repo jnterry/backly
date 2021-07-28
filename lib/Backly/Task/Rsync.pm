@@ -57,7 +57,7 @@ sub backup {
 
 	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
 	if($config->{ssh}{key_path}){
-		$cmd .= qq{ -e 'ssh -i "$config->{ssh}{key_path}"' };
+		$cmd .= qq{ -e '/usr/bin/ssh -i "$config->{ssh}{key_path}"' };
 	}
 
 	my $ssh_str = $task->{host} . ':' . $task->{root} . '/';
@@ -79,7 +79,7 @@ sub backup {
   };
 	$cmd =~ s/\n//g;
 
-	print "Performing rsync of $task->{host}:$task->{root}...\n";
+	print "Performing rsync of ${ssh_str}...\n";
 	qx{$cmd};
 	die "Rsync failed, exit: $?" unless $? == 0;
 	print "Rsync complete\n";
