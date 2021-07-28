@@ -36,7 +36,7 @@ sub main {
 	$config->{ssh}{key_path} = $cli->{identity} if $cli->{identity};
 
 	# Load service specific config
-	my $service = LoadFile(($config->{services} || '/etc/backly/services.d') . '/' . $cli->{service} . '.yaml');
+	my $service    = _load_service_config($config, $cli->{service});
 	my $serviceDir = $config->{destination} . "/" . ($service->{name} || $cli->{service});
 
 	# Create a new btrfs subvolume for the live data
@@ -67,6 +67,26 @@ sub main {
 	}
 
 	return $success ? 0 : 1;
+}
+
+# Helper to load the service config from yaml and perform some initial validation
+sub _load_service_config {
+	my ($config, $name) = @_;
+
+	my $path = ($config->{services} || '/etc/backly/services.d') . "/${name}.yaml";
+
+	die "No config for service ${name} at $path" unless -f $path;
+
+	my $service = LoadFile($path);
+
+	die "Service $name does not include task list" unless $service->{tasks};
+
+	foreach my $task (@{$service->{tasks}}) {
+		die "Service '$name' includes task without name" unless $task->{name};
+		die "Service '$name', task '$task->{name}' does not have a type" unless $task->{type};
+	}
+
+	return $service;
 }
 
 # Helper which runs the individual tasks within a service
