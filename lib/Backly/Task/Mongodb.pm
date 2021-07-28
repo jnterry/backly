@@ -68,6 +68,7 @@ sub backup {
 	print $_ while <$err>;
 
 	die "mongodump failed: " . $ssh->error if $ssh->error;
+	die "mongodump failed - no data was written" unless (-f $targetFile && -s $targetFile);
 
 	print "Completed mongodump of $task->{database}\n";
 
