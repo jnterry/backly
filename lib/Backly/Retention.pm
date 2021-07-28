@@ -12,8 +12,6 @@ use warnings;
 use POSIX qw(floor);
 use DateTime;
 
-use Data::Dumper;
-
 use Exporter qw(import);
 our @EXPORT_OK = qw(
   compute_retained
@@ -131,8 +129,6 @@ sub _bucket_by_all {
 	my %buckets = ();
 	$buckets{$_} = [$_] foreach (keys %$snapshots);
 
-	print Dumper(\%buckets);
-
 	return _post_process_buckets($limit, %buckets);
 }
 
@@ -148,12 +144,9 @@ sub _post_process_buckets {
 
 	# keep only the $limit most recent buckets
 	my @results = keys %buckets;
-	print Dumper(\@results);
 	@results = sort { $b cmp $a } @results;
 	@results = grep { defined $_ } @results[0..$limit-1]; # limit to n most recent
 	@results = map  { $buckets{$_} } @results; # map from bucket names to items array
-
-	print Dumper(\@results);
 
 	return \@results;
 }
