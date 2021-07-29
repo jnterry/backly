@@ -1,0 +1,21 @@
+Source: backly
+Section: main
+Priority: optional
+Maintainer: Jamie Terry
+Standards-Version: 4.3.0
+Testsuite: autopkgtest
+
+Package: backly
+Architecture: all
+Depends: ${perl:Depends},
+				 perl,
+				 libdatetime-perl,
+         libfile-tee-perl,
+         libgetopt-long-descriptive-perl,
+				 libnet-openssh-perl,
+				 libyaml-perl,
+				 ssh-client,
+				 rsync,
+				 btrfs-progs
+Essential: no
+Description: Utility for performing backups of remote machines

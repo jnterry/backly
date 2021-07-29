@@ -1,0 +1,5 @@
+backly (0.0.1) stable; urgency=medium
+
+  * Initial release with support for rsync, mysql and mongodb backup tasks
+
+ -- Jamie Terry <jamie-terry@outlook.com>  Wed, 28 Jul 2021 11:32:13 +0100

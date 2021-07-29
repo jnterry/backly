@@ -1,0 +1,3 @@
+Test-Command: /usr/bin/prove --jobs 4 -lr t/
+Depends: libtest-perl-critic-perl,
+				 libtest-pod-perl
