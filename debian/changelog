@@ -1,3 +1,9 @@
+backly (0.0.2) stable; urgency=medium
+
+  * Add support for custom ssh_port parameter in all backup tasks
+
+ -- Jamie Terry <jamie-terry@outlook.com>  Fri, 11 Oct 2025 15:54:32 +0100
+
 backly (0.0.1) stable; urgency=medium
 
   * Initial release with support for rsync, mysql and mongodb backup tasks

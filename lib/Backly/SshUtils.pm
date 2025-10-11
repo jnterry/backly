@@ -32,17 +32,19 @@ Estabilishes a new SSH connection to host given the Backly config
 
 =cut
 sub open_ssh {
-	my ($config, $host) = @_;
+	my ($config, $host, $ssh_port) = @_;
 
 	my $user = $config->{ssh}{user} || getlogin();
 
 	my $cacheKey = $user . '@' . $host;
+	$cacheKey .= ':' . $ssh_port if $ssh_port;
 	return $connectionCache{$cacheKey} if $connectionCache{$cacheKey};
 
 	my %params = (
 		user => $user,
 	);
 	$params{key_path} = $config->{ssh}{key_path} if $config->{ssh}{key_path};
+	$params{port} = $ssh_port if $ssh_port;
 
 	print "Opening SSH Connection to $host\n";
 

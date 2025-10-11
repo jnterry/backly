@@ -30,6 +30,10 @@ Mysql password to login with
 
 Name of the database to backup
 
+=item C<ssh_port>
+
+Optional SSH port number for remote connections. If not specified, uses the default SSH port (22).
+
 =back
 
 =head1 FUNCTIONS
@@ -44,7 +48,7 @@ Implementation of mysql backup task
 sub backup {
 	my ($pkg, $config, $destination, $task) = @_;
 
-	my $ssh = open_ssh($config, $task->{host});
+	my $ssh = open_ssh($config, $task->{host}, $task->{ssh_port});
 
 	my $targetFile = "${destination}/$task->{database}.sql";
 	print "Dumping to $targetFile\n";

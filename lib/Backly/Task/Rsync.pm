@@ -37,6 +37,10 @@ Since the global exclude * prevents recursion down through a/ and b/
 
 Array of rsync --exclude patterns
 
+=item C<ssh_port>
+
+Optional SSH port number for remote connections. If not specified, uses the default SSH port (22).
+
 =back
 
 =head1 FUNCTIONS
@@ -56,9 +60,14 @@ sub backup {
 	close $fh;
 
 	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
+	my $ssh_cmd = '/usr/bin/ssh';
 	if($config->{ssh}{key_path}){
-		$cmd .= qq{ -e '/usr/bin/ssh -i "$config->{ssh}{key_path}"' };
+		$ssh_cmd .= ' -i "' . $config->{ssh}{key_path} . '"';
 	}
+	if($task->{ssh_port}){
+		$ssh_cmd .= ' -p ' . $task->{ssh_port};
+	}
+	$cmd .= qq{ -e '$ssh_cmd' };
 
 	my $ssh_str = $task->{host} . ':' . $task->{root} . '/';
 	$ssh_str .= '/' unless $ssh_str =~ m|/$|;
