@@ -59,7 +59,7 @@ sub backup {
 	print $fh _build_rsync_patterns($task->{include} // [], $task->{exclude} // []);
 	close $fh;
 
-	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
+	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rlz';
 	my $ssh_cmd = '/usr/bin/ssh';
 	if($config->{ssh}{key_path}){
 		$ssh_cmd .= ' -i "' . $config->{ssh}{key_path} . '"';

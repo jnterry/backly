@@ -36,24 +36,25 @@ sub main {
 	$config->{ssh}{key_path} = $cli->{identity} if $cli->{identity};
 
 	# Load service specific config
-	my $service    = _load_service_config($config, $cli->{service});
-	my $serviceDir = $config->{destination} . "/" . ($service->{name} || $cli->{service});
+	my $service     = _load_service_config($config, $cli->{service});
+	my $service_name = $service->{name} || $cli->{service};
+	my $service_dir  = $config->{destination} . "/" . $service_name;
 
 	# Create a new btrfs subvolume for the live data
-	my $liveDir = create_live_volume($serviceDir);
+	my $live_dir = create_live_volume($service_dir);
 
 	# Duplicate the backup's log to the target directory
-	my $log_path = "${liveDir}/backly-log.txt";
+	my $log_path = "${live_dir}/backly-log.txt";
 	truncate $log_path, 0;
 	tee STDOUT, '>>', $log_path;
 	tee STDERR, '>>', $log_path;
 
 	# Perform backup tasks
-	my $success = _run_tasks($config, $liveDir, $service);
+	my $success = _run_tasks($config, $live_dir, $service);
 
 	# Create read-only snapshot
-	_clean_live_dir($serviceDir, $service);
-	create_snapshot($serviceDir, $success);
+	_clean_live_dir($service_dir, $service);
+	create_snapshot($service_dir, $success);
 
 	# Remove any out of date snapshots
 	my $retentionConfig = $service->{retention} || $config->{default_retention};
@@ -64,7 +65,11 @@ sub main {
 	} elsif (!$success) {
 		print "Skipping deleting old snapshots since backup was not fully successful\n";
 	} else {
-		delete_old_snapshots($serviceDir, $retentionConfig);
+		delete_old_snapshots($service_dir, $retentionConfig);
+	}
+
+	if ($config->{mirror_to}) {
+		_mirror_to($config, $service_dir, $service_name);
 	}
 
 	return $success ? 0 : 1;
@@ -154,4 +159,48 @@ sub _clean_live_dir {
 		remove_tree("$path/$item") unless $toKeep{$item};
 	}
 	closedir($dh);
+}
+
+# Mirrors the local backup of a service to a remote location after the backup has completed
+sub _mirror_to {
+	my ($config, $service_dir, $service_name) = @_;
+
+	my $mirror_to = $config->{mirror_to};
+
+	# Validate required mirror_to configuration
+	die "mirror_to config missing 'host' parameter" unless $mirror_to->{host};
+	die "mirror_to config missing 'path' parameter" unless $mirror_to->{path};
+
+	my $cmd = '/usr/bin/sudo /usr/bin/rsync -rz';
+	my $ssh_cmd = '/usr/bin/ssh';
+	if($mirror_to->{ssh_key_path}){
+		$ssh_cmd .= ' -i "' . $mirror_to->{ssh_key_path} . '"';
+	}
+	if($mirror_to->{ssh_port}){
+		$ssh_cmd .= ' -p ' . $mirror_to->{ssh_port};
+	}
+	$cmd .= qq{ -e '$ssh_cmd' };
+
+	my $remote_str = $mirror_to->{host} . ':' . $mirror_to->{path};
+	$remote_str .= '/' unless $remote_str =~ m|[:/]$|;
+	$remote_str .= $service_name;
+	$remote_str .= '/' unless $remote_str =~ m|/$|;
+	$remote_str = $mirror_to->{user} . '@' . $remote_str if $mirror_to->{user} and $mirror_to->{host} !~ /@/;
+
+	$cmd .= qq {
+		--perms
+		--times
+		--links
+		-og
+		--numeric-ids
+		--delete-after
+		--progress -h
+		${service_dir}/live/ ${remote_str}
+	};
+	$cmd =~ s/\n//g;
+
+	print "Mirroring local backup of service ${service_name} to remote ${remote_str}...\n";
+	my $result = qx{$cmd};
+	die "Mirror rsync failed, exit: $?" unless $? == 0;
+	print "Mirror complete\n";
 }
