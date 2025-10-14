@@ -1,3 +1,9 @@
+backly (0.0.3) stable; urgency=medium
+
+  * Add support for mirroing local backups to another server for extra redundancy
+
+ -- Jamie Terry <jamie-terry@outlook.com>  Tue, 14 Oct 2025 15:13:48 +0100
+
 backly (0.0.2) stable; urgency=medium
 
   * Add support for custom ssh_port parameter in all backup tasks
