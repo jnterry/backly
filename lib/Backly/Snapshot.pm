@@ -83,7 +83,8 @@ Deletes an existing snapshot specified by absolute path
 sub delete_snapshot {
 	my ($path) = @_;
 
-	qx|/usr/bin/btrfs subvolume delete $path| if -d $path;
+	# Deleting a subvolume requires root, unlike creating one
+	qx|/usr/bin/sudo /usr/bin/btrfs subvolume delete $path| if -d $path;
 	die "Failed to delete snapshot $path, exit: $?" unless $? == 0;
 }
 
